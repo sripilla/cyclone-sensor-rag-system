@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+venv/
+.venv/
+env1/
+env2/
+
+# Raw data
+Task1/data/raw/*.xlsx
+!Task1/data/raw/.gitkeep
+
+# Model and index artifacts
+Task2/prototype/outputs/*.faiss
+Task2/prototype/outputs/*.pkl
+Task2/prototype/outputs/bm25_index*
+
+# OS and editor
+.DS_Store
+.vscode/
+*.log

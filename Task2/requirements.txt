@@ -1,0 +1,11 @@
+sentence-transformers
+faiss-cpu
+rank-bm25
+pymupdf
+fastapi
+uvicorn
+streamlit
+ollama
+numpy
+pandas
+python-multipart
