@@ -1,0 +1,42 @@
+column,issue_type,value,count
+Cyclone_Inlet_Gas_Temp,non_numeric_value,Not Connect,723
+Cyclone_Inlet_Gas_Temp,non_numeric_value,I/O Timeout,470
+Cyclone_Inlet_Gas_Temp,non_numeric_value,Configure,108
+Cyclone_Inlet_Gas_Temp,non_numeric_value,Scan Timeout,17
+Cyclone_Inlet_Gas_Temp,non_numeric_value,Comm Fail,2
+Cyclone_Material_Temp,non_numeric_value,Not Connect,723
+Cyclone_Material_Temp,non_numeric_value,I/O Timeout,470
+Cyclone_Material_Temp,non_numeric_value,Unit Down,271
+Cyclone_Material_Temp,non_numeric_value,Configure,108
+Cyclone_Material_Temp,non_numeric_value,Scan Timeout,17
+Cyclone_Material_Temp,non_numeric_value,Comm Fail,2
+Cyclone_Outlet_Gas_draft,non_numeric_value,Not Connect,723
+Cyclone_Outlet_Gas_draft,non_numeric_value,I/O Timeout,470
+Cyclone_Outlet_Gas_draft,non_numeric_value,Configure,108
+Cyclone_Outlet_Gas_draft,non_numeric_value,Scan Timeout,17
+Cyclone_Outlet_Gas_draft,non_numeric_value,Comm Fail,2
+Cyclone_Outlet_Gas_draft,non_numeric_value,Unit Down,1
+Cyclone_cone_draft,non_numeric_value,Not Connect,723
+Cyclone_cone_draft,non_numeric_value,I/O Timeout,470
+Cyclone_cone_draft,non_numeric_value,Configure,108
+Cyclone_cone_draft,non_numeric_value,Scan Timeout,17
+Cyclone_cone_draft,non_numeric_value,Comm Fail,2
+Cyclone_Gas_Outlet_Temp,non_numeric_value,Not Connect,723
+Cyclone_Gas_Outlet_Temp,non_numeric_value,I/O Timeout,470
+Cyclone_Gas_Outlet_Temp,non_numeric_value,Configure,108
+Cyclone_Gas_Outlet_Temp,non_numeric_value,Scan Timeout,17
+Cyclone_Gas_Outlet_Temp,non_numeric_value,Comm Fail,2
+Cyclone_Gas_Outlet_Temp,non_numeric_value,Unit Down,1
+Cyclone_Inlet_Draft,non_numeric_value,Not Connect,723
+Cyclone_Inlet_Draft,non_numeric_value,I/O Timeout,470
+Cyclone_Inlet_Draft,non_numeric_value,Configure,108
+Cyclone_Inlet_Draft,non_numeric_value,Scan Timeout,17
+Cyclone_Inlet_Draft,non_numeric_value,Unit Down,2
+Cyclone_Inlet_Draft,non_numeric_value,Comm Fail,2
+time,duplicate_timestamps,,0
+Cyclone_Inlet_Gas_Temp,outlier_count_iqr3,"[721.6, 1035.8]",80057
+Cyclone_Material_Temp,outlier_count_iqr3,"[639.4, 1171.8]",76954
+Cyclone_Outlet_Gas_draft,outlier_count_iqr3,"[-478.7, 61.5]",0
+Cyclone_cone_draft,outlier_count_iqr3,"[-476.7, 106.5]",2
+Cyclone_Gas_Outlet_Temp,outlier_count_iqr3,"[508.6, 1192.3]",74998
+Cyclone_Inlet_Draft,outlier_count_iqr3,"[-365.4, 35.7]",7
