@@ -154,7 +154,7 @@ Most anomalies therefore represent other process-quality concerns, including the
 
 ### 7.5 Forecasting Performance
 
-The Random Forest model achieved an overall RMSE of 21.45 compared with 22.67 for the persistence baseline.
+The Random Forest model achieved an overall RMSE of 19.47 compared with 22.67 for the persistence baseline.
 
 However, Random Forest performed worse during shutdown-overlapping forecast windows, highlighting the importance of accounting for changing operating conditions.
 
