@@ -9,3 +9,4 @@ ollama
 numpy
 pandas
 python-multipart
+tiktoken
