@@ -9,7 +9,7 @@ import numpy as np
 import pickle
 
 from pathlib import Path
-from sentence_transformers import SentenceTransformer
+from sentence_transformers import SentenceTransformer, CrossEncoder
 from rank_bm25 import BM25Okapi
 
 
@@ -37,6 +37,8 @@ BLANK_PAGE_PATTERN = re.compile(
 ENCODING_NAME = "cl100k_base"
 
 EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
+
+RERANKER_MODEL_NAME = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
 
 # ============================================================
@@ -465,6 +467,128 @@ def build_indexes(all_chunks):
     return index, bm25, model
 
 
+def bm25_search(bm25, tokenized_corpus, query, top_k=10):
+    tokenized_query = query.lower().split()
+    scores = bm25.get_scores(tokenized_query)
+
+    ranked = np.argsort(scores)[::-1][:top_k]
+
+    return [(idx, scores[idx]) for idx in ranked]
+
+
+def dense_search(index, model, query, top_k=10):
+    query_vec = model.encode(
+        [query],
+        normalize_embeddings=True
+    ).astype("float32")
+
+    scores, indices = index.search(query_vec, top_k)
+
+    return [
+        (idx, score)
+        for idx, score in zip(indices[0], scores[0])
+        if idx >= 0
+    ]
+
+
+def reciprocal_rank_fusion(dense_results, bm25_results, k=60):
+    fused_scores = {}
+
+    for rank, (idx, _) in enumerate(dense_results):
+        fused_scores[idx] = (
+            fused_scores.get(idx, 0) + 1 / (k + rank + 1)
+        )
+
+    for rank, (idx, _) in enumerate(bm25_results):
+        fused_scores[idx] = (
+            fused_scores.get(idx, 0) + 1 / (k + rank + 1)
+        )
+
+    return sorted(
+        fused_scores.items(),
+        key=lambda x: x[1],
+        reverse=True
+    )
+
+def hybrid_search(
+    index,
+    bm25,
+    tokenized_corpus,
+    model,
+    reranker,
+    all_chunks,
+    query,
+    top_k=10,
+    rerank_top_n=5
+):
+    # Step 1: Retrieve using dense search
+    dense_results = dense_search(
+        index, model, query, top_k=top_k
+    )
+
+    # Step 2: Retrieve using BM25
+    bm25_results = bm25_search(
+        bm25, tokenized_corpus, query, top_k=top_k
+    )
+
+    # Step 3: Combine rankings using RRF
+    fused = reciprocal_rank_fusion(
+        dense_results, bm25_results
+    )[:top_k]
+
+    # Step 4: Prepare candidate chunks
+    candidates = [
+        all_chunks[idx]
+        for idx, _ in fused
+    ]
+
+    # Step 5: Cross-Encoder reranking
+    pairs = [
+        [query, chunk["text"]]
+        for chunk in candidates
+    ]
+
+    rerank_scores = reranker.predict(pairs)
+
+    # Step 6: Sort by reranking score
+    reranked = sorted(
+        zip(candidates, rerank_scores),
+        key=lambda x: x[1],
+        reverse=True
+    )
+
+    return reranked[:rerank_top_n]
+
+def test_hybrid_retrieval(
+    index,
+    bm25,
+    tokenized_corpus,
+    model,
+    reranker,
+    all_chunks,
+    query
+):
+    results = hybrid_search(
+        index,
+        bm25,
+        tokenized_corpus,
+        model,
+        reranker,
+        all_chunks,
+        query
+    )
+
+    print(f"\nHybrid + Reranked Query: {query!r}")
+
+    for rank, (chunk, score) in enumerate(results, start=1):
+        snippet = chunk["text"][:200].replace("\n", " ")
+
+        print(
+            f"  #{rank} (rerank_score={score:.3f}) "
+            f"[{chunk['document']} p.{chunk['page']}]"
+        )
+        print(f"      {snippet}...")
+
 # ============================================================
 # PHASE 8: DENSE RETRIEVAL SANITY TEST
 # ============================================================
@@ -504,6 +628,7 @@ def test_retrieval(index, model, all_chunks, query, top_k=3):
         )
 
         print(f"      {snippet}...")
+
 
 
 # ============================================================
@@ -548,6 +673,21 @@ def main():
 
     index, bm25, model = build_indexes(
         all_chunks
+    )
+
+    # Phase 9: Prepare BM25 corpus
+
+    tokenized_corpus = [
+        chunk["text"].lower().split()
+        for chunk in all_chunks
+    ]
+
+    # Phase 9: Load Cross-Encoder reranker
+
+    print("\nLoading Cross-Encoder reranking model...")
+
+    reranker = CrossEncoder(
+        RERANKER_MODEL_NAME
     )
 
     # Final summary
@@ -597,12 +737,12 @@ def main():
     )
 
     # ========================================================
-    # DENSE RETRIEVAL SANITY TESTS
+    # PHASE 8: DENSE RETRIEVAL SANITY TESTS
     # ========================================================
 
     print("\n" + "=" * 65)
 
-    print("DENSE RETRIEVAL SANITY TEST")
+    print("PHASE 8: DENSE RETRIEVAL SANITY TEST")
 
     print("=" * 65)
 
@@ -627,6 +767,197 @@ def main():
         "What personal protective equipment is required?"
     )
 
+    # ========================================================
+    # PHASE 9: HYBRID RETRIEVAL + RERANKING TESTS
+    # ========================================================
+
+    print("\n" + "=" * 65)
+
+    print("PHASE 9: HYBRID RETRIEVAL + RERANKING")
+
+    print("=" * 65)
+
+    test_hybrid_retrieval(
+        index,
+        bm25,
+        tokenized_corpus,
+        model,
+        reranker,
+        all_chunks,
+        "What does a sudden draft drop indicate?"
+    )
+
+    test_hybrid_retrieval(
+        index,
+        bm25,
+        tokenized_corpus,
+        model,
+        reranker,
+        all_chunks,
+        "How do I start up the cyclone separator?"
+    )
+
+    test_hybrid_retrieval(
+        index,
+        bm25,
+        tokenized_corpus,
+        model,
+        reranker,
+        all_chunks,
+        "What personal protective equipment is required?"
+    )
+    # ========================================================
+    # PHASE 9: RETRIEVAL EVALUATION
+    # ========================================================
+
+    print("\n" + "=" * 65)
+    print("PHASE 9: RETRIEVAL EVALUATION")
+    print("=" * 65)
+
+    run_evaluation(
+        index,
+        bm25,
+        tokenized_corpus,
+        model,
+        reranker,
+        all_chunks
+    )
+
+# ============================================================
+# PHASE 9: RETRIEVAL EVALUATION DATASET
+# ============================================================
+
+EVAL_SET = [
+    {
+        "query": "How do I start up the cyclone separator?",
+        "relevant": [
+            ("Cyclone_Emission_Control.pdf", 11),
+            ("Cyclone_Emission_Control.pdf", 10),
+            ("Parker_DustHog_C_Series_Cyclone_Dust_Collector_User_Guide.pdf", 23),
+        ],
+    },
+    {
+        "query": "What personal protective equipment is required?",
+        "relevant": [
+            ("654b45bb8292f586313470.pdf", 12),
+            ("654b45bb8292f586313470.pdf", 13),
+        ],
+    },
+    {
+        "query": "What does a sudden draft drop indicate?",
+        "relevant": [],
+    },
+    {
+        "query": "What should an operator inspect when the cyclone has reduced suction?",
+        "relevant": [
+            ("654b45bb8292f586313470.pdf", 17),
+        ],
+    },
+    {
+        "query": "How frequently should the cyclone dust container be checked and emptied?",
+        "relevant": [
+            ("654b45bb8292f586313470.pdf", 17),
+        ],
+    },
+]
+
+# ============================================================
+# PHASE 9: RETRIEVAL EVALUATION
+# ============================================================
+
+def precision_recall_at_k(results, relevant_set, k=5):
+    # Evaluate unique document-page pairs, not duplicate chunks.
+    top_k = list(dict.fromkeys(
+        (chunk["document"], chunk["page"])
+        for chunk, _ in results
+    ))[:k]
+
+    hits = [page for page in top_k if page in relevant_set]
+
+    precision = len(hits) / k
+    recall = (
+        len(set(hits)) / len(relevant_set)
+        if relevant_set else None
+    )
+
+    return precision, recall
+
+
+def run_evaluation(
+    index,
+    bm25,
+    tokenized_corpus,
+    model,
+    reranker,
+    all_chunks
+):
+
+    eval_rows = []
+
+    for case in EVAL_SET:
+
+        results = hybrid_search(
+            index,
+            bm25,
+            tokenized_corpus,
+            model,
+            reranker,
+            all_chunks,
+            case["query"],
+            top_k=10,
+            rerank_top_n=5
+        )
+
+        relevant_set = set(case["relevant"])
+
+        precision, recall = precision_recall_at_k(
+            results,
+            relevant_set,
+            k=5
+        )
+
+        top_score = (
+            float(results[0][1])
+            if results else None
+        )
+
+        eval_rows.append({
+            "query": case["query"],
+            "precision_at_5": precision,
+            "recall_at_5": recall,
+            "top_rerank_score": top_score,
+            "n_relevant_labeled": len(relevant_set)
+        })
+
+        print(f"\nQuery: {case['query']}")
+        print(f"Precision@5: {precision:.3f}")
+        print(
+            f"Recall@5: {recall:.3f}"
+            if recall is not None
+            else "Recall@5: N/A (no relevant pages)"
+        )
+        print(f"Top rerank score: {top_score}")
+
+    # Save evaluation results
+
+    evaluation_path = OUT_DIR / "evaluation.csv"
+
+    with open(
+        evaluation_path,
+        "w",
+        newline="",
+        encoding="utf-8"
+    ) as f:
+
+        writer = csv.DictWriter(
+            f,
+            fieldnames=eval_rows[0].keys()
+        )
+
+        writer.writeheader()
+        writer.writerows(eval_rows)
+
+    print(f"\nEvaluation results saved to: {evaluation_path}")
 
 if __name__ == "__main__":
     main()
