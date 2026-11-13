@@ -1,0 +1,6 @@
+query,precision_at_5,recall_at_5,top_rerank_score,n_relevant_labeled
+How do I start up the cyclone separator?,0.6,1.0,8.163139343261719,3
+What personal protective equipment is required?,0.4,1.0,5.21345853805542,2
+What does a sudden draft drop indicate?,0.0,,-8.483023643493652,0
+What should an operator inspect when the cyclone has reduced suction?,0.2,1.0,3.3458871841430664,1
+How frequently should the cyclone dust container be checked and emptied?,0.2,1.0,4.570659637451172,1
