@@ -31,16 +31,10 @@ Build a Retrieval-Augmented Generation (RAG) prototype that answers questions fr
 
 ## Environment Setup
 
-Activate the environment:
-
 ```bash
 source Task2/env2/bin/activate
-```
-
-Install dependencies:
-
-```bash
 pip install -r Task2/requirements.txt
+pip install fastapi uvicorn streamlit
 ```
 
 Deactivate:
@@ -51,9 +45,21 @@ deactivate
 
 ## Directory Structure
 
-- `prototype/docs/` — Technical PDF documents
-- `prototype/outputs/` — Generated indexes, extracted content and evaluation outputs
-- `prototype/rag_prototype.py` — RAG prototype implementation
+```
+Task2/
+├── architecture_diagram.pptx   — System architecture diagram
+├── requirements.txt
+└── prototype/
+    ├── docs/                   — Sample technical PDF documents
+    ├── outputs/                — Generated indexes, extracted content, evaluation outputs
+    ├── rag_prototype.py        — Core pipeline: ingestion -> indexing -> retrieval -> generation -> guardrails
+    ├── api.py                  — FastAPI backend
+    ├── streamlit_app.py        — Streamlit frontend
+    ├── notes.md                — Design trade-offs, retrieval strategy, guardrails, scalability
+    └── README.md               — Exact setup and run instructions
+```
+
+See `architecture_diagram.pptx` for the visual pipeline, and `prototype/notes.md` for the full written design discussion.
 
 ## Retrieval Evaluation
 
@@ -67,41 +73,18 @@ The hybrid retrieval and reranking pipeline was evaluated using five manually la
 | Reduced suction inspection | 0.20 | 1.00 |
 | Dust container inspection | 0.20 | 1.00 |
 
-The sudden draft drop query had no relevant labelled pages in the retrieved evaluation set.
+The sudden draft drop query had no relevant labelled pages in the retrieved evaluation set — a deliberate test case for the no-answer guardrail, not a retrieval failure. These results are preliminary and based on a small manually labelled query set.
 
-These results are preliminary and based on a small manually labelled query set.
+## Guardrails
 
-## LLM Integration and Guardrails
+The prototype integrates a locally hosted Ollama language model to generate answers grounded in retrieved document excerpts, with four guardrails: grounded generation (LLM instructed to use only retrieved excerpts), citation validation (generated citations checked against retrieved document-page pairs), a retrieval-score no-answer gate, and sensitive-query filtering before retrieval and generation. Testing found real cases of each guardrail firing correctly, including the citation validator catching an unsupported page reference and a citation whose source was real but whose claim wasn't supported by it.
 
-The prototype integrates a locally hosted Ollama language model to generate answers using retrieved document excerpts.
-
-The following guardrails are implemented:
-
-- **Grounded generation:** The LLM is instructed to use only the retrieved document excerpts.
-- **Citation validation:** Generated citations are checked against the retrieved document-page pairs.
-- **No-answer fallback:** Queries without sufficient retrieval support receive a predefined no-answer response.
-- **Sensitive-query filtering:** Queries matching configured sensitive patterns are blocked before retrieval and generation.
-- **Strict answer rejection:** The complete answer is rejected if citation validation detects unsupported or incorrectly formatted citations.
-
-## Observed Guardrail Behaviour
-
-Testing demonstrated the following behaviours:
-
-- **Unsupported page references:** In the PPE test, the LLM cited page 14 of `654b45bb8292f586313470.pdf`, although page 14 was not among the retrieved pages. Citation validation rejected the answer.
-- **Citation-format issues:** The start-up test produced shortened citation formats, resulting in answer rejection.
-- **Unsupported interpretation:** For the sudden draft drop query, the LLM generated a speculative explanation citing `D13.pdf` page 4. Although the page was retrieved, the excerpt did not explicitly establish the claimed relationship. The retrieval-score gate rejected the query before production answer generation.
-- **Sensitive-query filtering:** A request for a colleague's home address was blocked before retrieval and generation.
-
-## Known Limitations and Design Trade-offs
-
-- Citation validation confirms whether a cited document-page pair belongs to the retrieved context. It does not establish whether the cited passage semantically supports the associated claim.
-- The reranker threshold is a heuristic retrieval gate, not a calibrated measure of factual confidence.
-- The system rejects the entire answer when even one citation is unsupported. This is a deliberate conservative choice that prioritizes reliability over answer completeness.
-- Claim-level evidence verification and automatic correction of unsupported statements are not implemented.
-- Retrieval evaluation is preliminary and uses only five manually labelled queries.
+**Full test-by-test findings, known limitations, and design trade-offs are documented in `prototype/notes.md` — this is the authoritative source, not a summary here.**
 
 ## Scalability Considerations
 
-The prototype uses a modular retrieval and generation pipeline. The architecture can be extended to support a larger document collection and concurrent users through separate ingestion and query-processing components, scalable indexing, and independently deployable API services.
+Brief summary (full discussion with specifics in `prototype/notes.md`): the current exact-search FAISS/BM25 setup holds up to roughly 10x this corpus's size before needing approximate-nearest-neighbor indexing and a proper search engine; 100+ concurrent users would require multiple API replicas and a batching LLM-inference server rather than the single local Ollama instance used here; cost-conscious cloud deployment favors CPU-only retrieval plus either a scale-to-zero serverless GPU endpoint or staying with a small quantized model, given bursty internal-tool traffic.
 
-These are proposed architectural extensions, not capabilities demonstrated by the current local prototype.
+## Running the Prototype
+
+See `prototype/README.md` for exact setup and run steps — both the standalone script and the FastAPI + Streamlit app.
